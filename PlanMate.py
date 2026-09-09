@@ -1,6 +1,6 @@
 import os
+import re
 import time
-import math
 import urllib.parse
 from pathlib import Path
 import requests
@@ -19,23 +19,10 @@ if not api_key:
     raise ValueError("❌ GEMINI_API_KEY is missing from your .env file! Add GEMINI_API_KEY=your_key in .env")
 
 # =========================================================================
-# 2. Distance Calculation (Haversine Formula)
-# =========================================================================
-def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculates geographical distance in kilometers between two GPS points."""
-    R = 6371.0  # Earth's radius in km
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) ** 2 + 
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return round(R * c, 1)
-
-# =========================================================================
-# 3. Comprehensive Sub-Activity Keyword Normalizer
+# 2. Comprehensive Sub-Activity Keyword Normalizer
 # =========================================================================
 def clean_search_term(category: str, sub: str) -> str:
-    """Translates user intents across Play, Eat, and Relax into high-match OSM keywords."""
+    """Translates user intents across Play, Eat, and Relax into high-match search keywords."""
     sub_lower = sub.lower().strip()
     
     mapping = {
@@ -56,6 +43,7 @@ def clean_search_term(category: str, sub: str) -> str:
         "tt": "table tennis",
         "squash": "squash court",
         "pickleball": "pickleball court",
+        "pickle ball": "sports centre",
         "padel": "padel tennis court",
         "basketball": "basketball court",
         "volleyball": "volleyball court",
@@ -118,6 +106,8 @@ def clean_search_term(category: str, sub: str) -> str:
         "korean": "korean restaurant",
         "shawarma": "shawarma grill restaurant",
         "kebabs": "kebab grill restaurant",
+        "sandwich": "sandwich cafe fast food",
+        "frankie": "frankie roll wrap",
         "cafe": "cafe coffee shop",
         "coffee": "cafe espresso coffee shop",
         "chai": "tea chai cafe",
@@ -161,7 +151,7 @@ def clean_search_term(category: str, sub: str) -> str:
     return sub_lower
 
 # =========================================================================
-# 4. Live API Tool 1: Real-Time Weather (wttr.in)
+# 3. Live API Tool 1: Real-Time Weather (wttr.in)
 # =========================================================================
 def get_live_weather(city: str) -> dict:
     """Fetches real-time weather and precipitation status for any city/locality."""
@@ -185,76 +175,23 @@ def get_live_weather(city: str) -> dict:
         return {"error": str(e)}
 
 # =========================================================================
-# 5. Live API Tool 2: Dynamic Venue & Distance Search (OpenStreetMap)
+# 4. Live API Tool 2: Generic Category Intent Search (Google Maps)
 # =========================================================================
 def search_places_with_maps(location: str, category: str, sub_activity: str) -> list:
-    """Queries real live places/venues, calculates real distance, and creates Maps links."""
-    headers = {"User-Agent": "PlanMate-LiveAgent/3.0 (dev-student@vectorclan.ai)"}
-    
-    # 1. Resolve Origin Coordinates
-    search_context = f"{location}, Hyderabad, India" if "hyderabad" not in location.lower() else location
-    geo_url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(search_context)}&format=json&limit=1"
-    
-    origin_lat, origin_lon = None, None
-    try:
-        geo_res = requests.get(geo_url, headers=headers, timeout=10).json()
-        if geo_res:
-            origin_lat = float(geo_res[0]["lat"])
-            origin_lon = float(geo_res[0]["lon"])
-    except Exception:
-        pass
-
-    # 2. Normalize search term
+    """Generates reliable, verified Google Maps search queries without distance math."""
     clean_keyword = clean_search_term(category, sub_activity)
-
-    # 3. Query OpenStreetMap
-    query_1 = f"{clean_keyword}, {location}, Hyderabad"
-    search_url_1 = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(query_1)}&format=json&limit=4"
+    maps_query = urllib.parse.quote_plus(f"{clean_keyword} near {location} Hyderabad")
     
-    results = []
-    try:
-        data = requests.get(search_url_1, headers=headers, timeout=10).json()
-        
-        # Bounding box fallback if first try has 0 results
-        if not data and origin_lat and origin_lon:
-            viewbox = f"{origin_lon - 0.09},{origin_lat + 0.09},{origin_lon + 0.09},{origin_lat - 0.09}"
-            search_url_2 = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(clean_keyword)}&viewbox={viewbox}&bounded=1&format=json&limit=4"
-            data = requests.get(search_url_2, headers=headers, timeout=10).json()
-
-        for place in data:
-            dest_lat = float(place["lat"])
-            dest_lon = float(place["lon"])
-            
-            dist = f"~{calculate_distance(origin_lat, origin_lon, dest_lat, dest_lon)} km away" if origin_lat else "Nearby"
-            name = place.get("display_name", "").split(",")[0]
-            area = ", ".join(place.get("display_name", "").split(",")[1:3]).strip()
-            
-            # Real destination coordinates link
-            gmaps_url = f"https://www.google.com/maps/search/?api=1&query={dest_lat},{dest_lon}"
-            
-            results.append({
-                "name": name,
-                "area": area if area else location,
-                "distance": dist,
-                "google_maps_link": gmaps_url
-            })
-    except Exception as e:
-        print(f"Search Warning: {e}")
-
-    # Fallback to direct Maps search if no tagged node exists
-    if not results:
-        maps_query = urllib.parse.quote_plus(f"{clean_keyword} near {location} Hyderabad")
-        results.append({
+    return [
+        {
             "name": f"Top rated {sub_activity.title()} spots in {location}",
             "area": location,
-            "distance": "Within your vicinity",
             "google_maps_link": f"https://www.google.com/maps/search/?api=1&query={maps_query}"
-        })
-
-    return results
+        }
+    ]
 
 # =========================================================================
-# 6. Function Tool Schemas for Gemini
+# 5. Function Tool Schemas for Gemini
 # =========================================================================
 weather_tool_schema = types.FunctionDeclaration(
     name="get_live_weather",
@@ -262,7 +199,7 @@ weather_tool_schema = types.FunctionDeclaration(
     parameters=types.Schema(
         type="OBJECT",
         properties={
-            "city": types.Schema(type="STRING", description="Target city or area name (e.g. Miyapur, Gachibowli, Hyderabad)")
+            "city": types.Schema(type="STRING", description="Target city or area name (e.g. Manikonda, Madhapur, Kondapur)")
         },
         required=["city"]
     )
@@ -270,13 +207,13 @@ weather_tool_schema = types.FunctionDeclaration(
 
 places_tool_schema = types.FunctionDeclaration(
     name="search_places_with_maps",
-    description="Searches for physical venues, sports arenas, food spots, cinemas, or spas with distances and direct Google Maps links.",
+    description="Searches for physical venues, sports arenas, food spots, cinemas, or spas with direct Google Maps links.",
     parameters=types.Schema(
         type="OBJECT",
         properties={
-            "location": types.Schema(type="STRING", description="User's city or neighborhood (e.g. Madhapur, Shamshabad)"),
+            "location": types.Schema(type="STRING", description="User's city or neighborhood"),
             "category": types.Schema(type="STRING", description="Primary category: 'play', 'eat', or 'relax'"),
-            "sub_activity": types.Schema(type="STRING", description="Specific activity (e.g. cricket, biryani, movie, gokart, library, spa)")
+            "sub_activity": types.Schema(type="STRING", description="Specific activity (e.g. badminton, frankie, sushi, gokarting)")
         },
         required=["location", "category", "sub_activity"]
     )
@@ -285,27 +222,56 @@ places_tool_schema = types.FunctionDeclaration(
 agent_tools = types.Tool(function_declarations=[weather_tool_schema, places_tool_schema])
 
 # =========================================================================
-# 7. System Instructions & Guardrails
+# 6. System Instructions & Guardrails
 # =========================================================================
 SYSTEM_INSTRUCTION = """
-You are 'PlanMate', an intelligent daily activity and lifestyle planning agent.
+You are 'PlanMate', an autonomous, real-time daily activity and lifestyle planning agent.
 
-OPERATIONAL RULES:
-1. Always call `get_live_weather` for the user's location.
-2. Always call `search_places_with_maps` to fetch real venues with distances and map links.
-3. If an outdoor activity (cricket, tennis, gokart) is requested and it is raining, explicitly warn the user and recommend indoor alternatives (indoor turf, bowling, cinema).
-4. Format output with clean bullet points: Venue Name, Distance (~X km), and a clickable link: `[Open in Google Maps](URL)`.
+CORE IDENTITY & PURPOSE:
+- Help users organize their leisure time across: 'Play' (sports/recreation), 'Eat' (dining/cafes), and 'Relax' (libraries/spas/movies).
+- Ground recommendations in real-world data using external tools; never invent or hallucinate venue names or weather.
 
-STRICT GUARDRAILS:
-- Answer ONLY requests related to daily planning (activities, dining, sports, movies, books/libraries, spas, weather).
-- For unrelated requests (e.g., coding help, homework, academic math, politics), politely decline:
+CRITICAL OPERATIONAL RULES:
+
+1. ANTI-HALLUCINATION & STRICT GROUNDING:
+   - You MUST ONLY recommend the EXACT category label returned in the `search_places_with_maps` tool response (e.g., "Top rated Frankie spots in Kondapur").
+   - NEVER invent or fabricate specific business, restaurant, shop, or venue names (e.g., do NOT invent names like 'Smaaash', 'Kathi Junction', 'Roll Corner', 'Aish', or 'Zobha').
+   - Output the category directly with its Google Maps search link.
+
+2. PARALLEL TOOL DISPATCH:
+   - On every activity inquiry, execute BOTH `get_live_weather` AND `search_places_with_maps` concurrently.
+
+3. LOCALITY PERSISTENCE:
+   - Always remember the user's active locality (e.g., Kondapur, Manikonda, Madhapur) across follow-up queries.
+   - Never switch cities or assume foreign locations unless explicitly commanded.
+
+4. MANDATORY MULTI-LINE MARKDOWN FORMATTING:
+   - NEVER write bullet points horizontally on a single line.
+   - You MUST follow the EXACT layout below with newlines and sub-bullets:
+
+⛅ **Weather Update**
+- **Temperature:** [Temp in °C]
+- **Condition:** [Condition string]
+- **Humidity:** [Humidity %]
+- **Verdict:** [1-2 sentences on outdoor/indoor suitability]
+
+---
+
+📍 **Recommended Options**
+- **[Venue Name or Category as returned by tool]**
+  * **Details:** [1 sentence factual overview of what to enjoy]
+  * **Directions:** [Open in Google Maps](URL)
+
+TOPICAL GUARDRAILS:
+- Answer ONLY requests related to daily planning (activities, dining, sports, movies, relaxation).
+- For off-topic requests (coding, homework, politics), politely reply:
   "I am PlanMate, your personal day planner! Please choose an activity (Play, Eat, Relax) so I can help plan your day."
 """
 
 # =========================================================================
-# 8. Safe Execution Helper with Rate-Limit Backoff
+# 7. Safe Execution Helper with Rate-Limit Backoff
 # =========================================================================
-def send_message_with_retry(chat, payload, max_retries=3):
+def send_message_with_retry(chat, payload, max_retries=4):
     """Retries request automatically if a 429 RESOURCE_EXHAUSTED error occurs."""
     for attempt in range(max_retries):
         try:
@@ -313,29 +279,38 @@ def send_message_with_retry(chat, payload, max_retries=3):
         except Exception as e:
             err_str = str(e)
             if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                wait_sec = 20 * (attempt + 1)
-                print(f"\n⏳ Rate limit cooldown. Pausing for {wait_sec}s (Attempt {attempt + 1}/{max_retries})...")
+                delay_match = re.search(r"retry in ([\d\.]+)s", err_str)
+                field_match = re.search(r"['\"]retryDelay['\"]\s*:\s*['\"](\d+)s?['\"]", err_str)
+                
+                if delay_match:
+                    wait_sec = float(delay_match.group(1)) + 1.0
+                elif field_match:
+                    wait_sec = float(field_match.group(1)) + 1.0
+                else:
+                    wait_sec = 25.0 * (attempt + 1)
+                    
+                print(f"\n⏳ Rate limit hit. Cooling down for {wait_sec:.1f}s (Attempt {attempt + 1}/{max_retries})...")
                 time.sleep(wait_sec)
             else:
                 raise e
     raise RuntimeError("Rate limit persisted. Please wait a minute and try again.")
 
 # =========================================================================
-# 9. Main Interactive Loop
+# 8. Main Interactive Loop
 # =========================================================================
 def run_planmate():
     client = genai.Client(api_key=api_key)
     chat = client.chats.create(
-        model="gemini-3.6-flash",
+        model="gemini-3.5-flash-lite",
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             tools=[agent_tools],
-            temperature=0.4
+            temperature=0.2
         )
     )
 
     print("=" * 65)
-    print("🎯 PlanMate (Weather + Dynamic OSM Venues + Google Maps) Ready!")
+    print("🎯 PlanMate (Weather + Category Maps Navigation) Ready!")
     print("Categories: Play | Eat | Relax")
     print("Type 'exit' to quit.")
     print("=" * 65 + "\n")
@@ -359,10 +334,10 @@ def run_planmate():
                     print(f"⚙️ [TOOL CALL] Executing: {fn_name}({args})")
 
                     if fn_name == "get_live_weather":
-                        tool_result = get_live_weather(args.get("city", "Hyderabad"))
+                        tool_result = get_live_weather(args.get("city", "Kondapur"))
                     elif fn_name == "search_places_with_maps":
                         tool_result = search_places_with_maps(
-                            args.get("location", "Hyderabad"),
+                            args.get("location", "Kondapur"),
                             args.get("category", "play"),
                             args.get("sub_activity", "activity")
                         )

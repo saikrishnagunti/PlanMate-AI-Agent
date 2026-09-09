@@ -1,4 +1,4 @@
-# Environment variables & API keys
+# Environment variables & API credentials
 .env
 *.env
 
@@ -17,6 +17,7 @@ env/
 .DS_Store
 Thumbs.db
 
-# Generated documentation & local exports
+# Intermediate testing and experimental files
+app_*.py
+PlanMate_*.py
 *.pdf
-localhost.pdf
