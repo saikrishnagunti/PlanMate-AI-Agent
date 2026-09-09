@@ -1,14 +1,14 @@
 # 🎯 PlanMate: Autonomous Activity & Dining AI Agent
 
-PlanMate is an autonomous conversational AI agent powered by **Gemini 3.6 Flash** designed to help users plan daily leisure activities, sports sessions, dining outings, and relaxation spots.
+PlanMate is an autonomous lifestyle and daily planning conversational AI agent powered by **Google Gemini 2.5 Flash**. It helps users discover leisure activities, sports sessions, dining spots, and relaxation spaces without hallucinated venues or stale information.
 
-Instead of generating static or hallucinated suggestions, PlanMate evaluates real-time environmental context (live weather) and executes geospatial lookups via **OpenStreetMap (Nominatim)** to provide real venue names, mathematically accurate distances ($km$), and direct navigation links to **Google Maps**.
+Instead of guessing locations, PlanMate evaluates real-time meteorological conditions (**wttr.in**) and executes targeted category searches linked directly to verified places on **Google Maps**.
 
 ---
 
-## 🏗️ Architecture & Execution Flow
+## 🏗️ Architecture & ReAct Workflow
 
-PlanMate operates on an iterative **ReAct (Reason + Act)** tool-calling execution loop:
+PlanMate operates on an iterative **ReAct (Reasoning + Acting)** tool execution loop:
 
 ```text
                             ┌────────────────────────┐
@@ -17,66 +17,159 @@ PlanMate operates on an iterative **ReAct (Reason + Act)** tool-calling executio
                                         │
                                         ▼
                       ┌────────────────────────────────────┐
-                      │    System Instructions & Guardrail │
-                      │          (Scope Validation)        │
+                      │    System Instructions & Firewall  │
+                      │       (Scope & Domain Guardrails)  │
                       └─────────────────┬──────────────────┘
                                         │
                                         ▼
                       ┌────────────────────────────────────┐
-                      │    Gemini 3.6 Flash Reasoning      │
-                      │     (Tool Call Resolution Loop)    │
+                      │    Gemini 2.5 Flash Reasoning      │
+                      │  (Parallel Tool Dispatch Decision) │
                       └─────────┬────────────────┬─────────┘
                                 │                │
             ┌───────────────────┘                └───────────────────┐
             ▼                                                        ▼
 ┌───────────────────────────┐                            ┌───────────────────────────┐
 │     get_live_weather      │                            │  search_places_with_maps  │
-│    (wttr.in REST API)     │                            │    (OpenStreetMap / OSM)  │
-│  - Checks Precipitation   │                            │  - Resolves Coordinates   │
-│  - Validates Outdoor Suit │                            │  - Computes Haversine (km)│
-└───────────┬───────────────┘                            │  - Builds Direct Maps Link│
-            │                                            └───────────┬───────────────┘
+│    (wttr.in REST API)     │                            │ (Targeted Google Maps API)│
+│  - Real-time Temp & Cond  │                            │  - Keyword Taxonomy       │
+│  - Precipitation Checks   │                            │  - Clean Deep-Links       │
+│  - Outdoor Suitability    │                            │  - Zero Venue Invention   │
+└───────────┬───────────────┘                            └───────────┬───────────────┘
             │                                                        │
             └───────────────────┬────────────────────────────────────┘
                                 │
                                 ▼
                       ┌────────────────────────────────────┐
                       │    Synthesized Final Response      │
-                      │ (Weather Advisory + Venues + Links)│
+                      │  (Weather Block + Verified Links)  │
                       └────────────────────────────────────┘
-🚀 Key Technical HighlightsMulti-Turn Function Tooling: Uses structured function declarations (types.FunctionDeclaration, types.Tool) allowing the model to dynamically request and resolve real-time tools.Environmental Context Validation: Integrates live weather data via wttr.in. If precipitation or adverse weather is detected, the agent warns the user and suggests indoor alternatives (e.g., covered box turf, bowling, multiplex).Dynamic Geospatial Search: Queries OpenStreetMap Nominatim dynamically without hardcoded place dictionaries. Straight-line distance is computed using the Haversine Formula:$$d = 2R \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta \phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta \lambda}{2}\right)}\right)$$Intent & Slang Normalizer: Maps natural language phrases (e.g., boxcricket, mandi, ekart, read a book, spa, biryani) to OpenStreetMap taxonomic tags.Strict Guardrails: Rejects out-of-domain requests (coding, trivia, homework) to maintain dedicated conversational focus.API Rate-Limit Handling: Implements exponential backoff wrappers to handle API rate limits and avoid abrupt terminations.📂 Project StructurePlaintext1st project/
-│
-├── .env                  # Private API credentials (Git-ignored)
-├── .gitignore            # Secret & artifact exclusion rules
-├── requirements.txt      # Python dependencies (google-genai, streamlit, requests, etc.)
-├── README.md             # Project documentation
-├── PlanMate.py           # Core CLI interactive agent loop
-├── app.py                # Streamlit Web Application interface
-└── localhost.pdf         # Local UI test exports/artifacts
-🛠️ Installation & SetupClone the repository:Bashgit clone [https://github.com/saikrishnagunti/PlanMate-AI-Agent.git](https://github.com/saikrishnagunti/PlanMate-AI-Agent.git)
-cd PlanMate-AI-Agent
-Install dependencies:Bashpip install -r requirements.txt
-Configure Environment Variables:Create a .env file in the root directory:Code snippetGEMINI_API_KEY=your_actual_gemini_api_key_here
-Run the Agent:CLI Terminal Mode:Bashpython PlanMate.py
-Streamlit Web Interface:Bashstreamlit run app.py
-🧪 Sample Interactions1. Activity Recommendation with Live Weather & CoordinatesPlaintextYou: i am in miyapur, i want to read a book, find me a library near my location
+```
 
-⚙️ [TOOL CALL] Executing: get_live_weather({'city': 'Miyapur'})
-⚙️ [TOOL CALL] Executing: search_places_with_maps({'category': 'relax', 'location': 'Miyapur', 'sub_activity': 'library'})
+---
+
+## 🚀 Key Technical Highlights
+
+* **Parallel Tool Dispatching**: Triggers both `get_live_weather` and `search_places_with_maps` concurrently in the initial model turn, cutting token overhead and API hops by 50%.
+
+* **Strict Grounding & Anti-Hallucination**: Eliminates fake venue hallucinations by constraining recommendations to verified Google Maps search intents rather than ungrounded shop names.
+
+* **Real-Time Weather Grounding**: Evaluates live weather conditions via `wttr.in`. If precipitation or adverse weather is present, the agent alerts the user and pivots outdoor plans to indoor options.
+
+* **Conversational Locality Anchoring**: Preserves user-declared localities (e.g., Manikonda, Madhapur, Kondapur) across follow-up turns without geographic amnesia.
+
+* **Keyword Normalizer**: Maps ~80 user intents and colloquial phrases (`boxcricket`, `futsal`, `mandi`, `gokarting`, `spa`, `sushi`) into targeted query terms.
+
+* **Rate-Limit Backoff Engine**: Automatically intercepts HTTP 429 quota exhaustion errors, parses Google's exact retry delay, and renders an active countdown timer before resuming execution.
+
+* **Domain Firewall**: Deflects out-of-scope requests (coding, homework, politics) using an explicit refusal prompt.
+
+---
+
+## 📂 Project Structure
+
+```text
+PlanMate-AI-Agent/
+│
+├── .env                  # Private Gemini API credentials (Git-ignored)
+├── .gitignore            # Secret & artifact exclusion rules
+├── requirements.txt      # Python runtime dependencies
+├── README.md             # Project documentation
+├── PlanMate.py           # CLI interactive terminal REPL
+└── app.py                # Streamlit web application interface
+```
+
+---
+
+## 🛠️ Prerequisites & Setup
+
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/saikrishnagunti/PlanMate-AI-Agent.git](https://github.com/saikrishnagunti/PlanMate-AI-Agent.git)
+cd PlanMate-AI-Agent
+```
+
+### 2. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure Environment Variables
+Create a `.env` file in the root directory:
+```env
+GEMINI_API_KEY=your_actual_gemini_api_key_here
+```
+
+---
+
+## 💻 Running the Application
+
+### Web UI (Streamlit Dashboard)
+```bash
+streamlit run app.py
+```
+
+### Terminal CLI (Interactive REPL)
+```bash
+python PlanMate.py
+```
+
+---
+
+## 🧪 Sample Interactions
+
+### 1. Activity & Dining Outing with Live Weather Grounding
+```text
+You: I am in Kondapur now, I want to play gokarting and eat frankie for supper at 5:00 PM
 
 PlanMate:
-Here are some library options around Miyapur, keeping in mind the current weather (29°C with patchy rain nearby):
+⛅ **Weather Update**
+- **Temperature:** 32°C
+- **Condition:** Cloudy
+- **Humidity:** 37%
+- **Verdict:** Pleasant cloudy weather, perfect for track racing and grabbing a quick evening bite around 5:00 PM.
 
-1. JNTU Library (JNTUHCEH, Way to CRC)
-   • Distance: ~3.6 km away
-   • Directions: [Open in Google Maps](https://www.google.com/maps/search/?api=1&query=17.498,78.389)
+---
 
-2. CRC Library / Reading Hall (JNTUHCEH Area)
-   • Distance: ~3.7 km away
-   • Directions: [Open in Google Maps](https://www.google.com/maps/search/?api=1&query=17.499,78.390)
+📍 **Recommended Options**
+- **Top rated Gokarting spots in Kondapur**
+  * **Details:** Discover high-octane racing circuits and professional go-karting tracks around your location.
+  * **Directions:** [Open in Google Maps](https://www.google.com/maps/search/?api=1&query=go+karting+circuit+track+near+Kondapur+Hyderabad)
 
-Since it might rain, remember to carry an umbrella!
-2. Guardrail ContainmentPlaintextYou: Write a python script to sort an array.
+- **Top rated Frankie spots in Kondapur**
+  * **Details:** Popular street food joints and eateries serving delicious, wrapped rolls and frankies.
+  * **Directions:** [Open in Google Maps](https://www.google.com/maps/search/?api=1&query=frankie+roll+wrap+near+Kondapur+Hyderabad)
+```
+
+### 2. Follow-up Turn with Locality Memory
+```text
+You: Change in plan, I want to eat sushi instead of frankie
+
+PlanMate:
+⛅ **Weather Update**
+- **Temperature:** 32°C
+- **Condition:** Cloudy
+- **Humidity:** 37%
+- **Verdict:** Great weather conditions for heading out to a restaurant in Kondapur.
+
+---
+
+📍 **Recommended Options**
+- **Top rated Sushi spots in Kondapur**
+  * **Details:** Fine dining restaurants and cafes serving fresh sushi and authentic Japanese cuisine.
+  * **Directions:** [Open in Google Maps](https://www.google.com/maps/search/?api=1&query=sushi+bar+restaurant+near+Kondapur+Hyderabad)
+```
+
+### 3. Out-of-Domain Guardrail Deflection
+```text
+You: Write a python script to sort an array.
 
 PlanMate:
 I am PlanMate, your personal day planner! Please choose an activity (Play, Eat, Relax) so I can help plan your day.
+```
+
+---
+
+## 📄 License
+
+MIT License. Developed for open-source AI agent research and development.
