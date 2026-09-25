@@ -9,9 +9,11 @@ from src.config import GEMINI_API_KEY
 from src.tools.weather import fetch_weather
 from src.agents.graph import planmate_graph
 
-location_component = components.declare_component(
-    "planmate_location",
-    path=str(Path(__file__).resolve().parent / "src" / "components" / "frontend" / "build"),
+location_component_path = Path(__file__).resolve().parent / "src" / "components" / "frontend" / "build"
+location_component = (
+    components.declare_component("planmate_location", path=str(location_component_path))
+    if location_component_path.is_dir()
+    else None
 )
 
 # ---------------------------------------------------------
@@ -255,7 +257,12 @@ if "custom_location_data" not in st.session_state:
     st.session_state.custom_location_data = None
 
 # Request browser location once; recommendations remain unavailable until it resolves.
-if st.session_state.location_enabled and not st.session_state.custom_location_data and not st.session_state.get("live_location_resolved", False) and not st.session_state.get("manual_location_selected", False):
+if location_component is None and st.session_state.location_enabled:
+    st.session_state.location_enabled = False
+    st.session_state.active_locality_name = "Location unavailable"
+    st.session_state.location_error = "The browser location component is unavailable in this deployment."
+
+if location_component and st.session_state.location_enabled and not st.session_state.custom_location_data and not st.session_state.get("live_location_resolved", False) and not st.session_state.get("manual_location_selected", False):
     browser_location = location_component(key="location_request")
     if browser_location and browser_location.get("latitude") is not None and browser_location.get("longitude") is not None:
         live_lat = float(browser_location["latitude"])

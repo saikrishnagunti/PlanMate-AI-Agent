@@ -27,6 +27,12 @@ build/
 .coverage
 htmlcov/
 
+# Required Streamlit browser component bundle
+!src/components/
+!src/components/frontend/
+!src/components/frontend/build/
+!src/components/frontend/build/index.html
+
 # Intermediate testing and experimental files
 app_*.py
 PlanMate_*.py
