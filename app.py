@@ -5,6 +5,7 @@ import urllib.parse
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
+from src.config import GEMINI_API_KEY
 from src.tools.weather import fetch_weather
 from src.agents.graph import planmate_graph
 
@@ -21,6 +22,9 @@ st.set_page_config(
     page_icon="🎯",
     layout="wide"
 )
+
+if not GEMINI_API_KEY:
+    st.warning("Gemini API key is not configured. Add GEMINI_API_KEY to Streamlit Cloud Secrets to enable venue recommendations.")
 
 # Load CSS
 css_path = Path(__file__).resolve().parent / "styles" / "main.css"

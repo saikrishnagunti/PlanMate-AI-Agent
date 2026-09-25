@@ -7,8 +7,6 @@ from google.genai import types
 
 from src.config import MODEL_NAME, GEMINI_API_KEY
 
-client = genai.Client(api_key=GEMINI_API_KEY)
-
 VENUE_PROFILES = {
     "Chandanagar": {"areas": ["Chandanagar", "Gangaram", "BHEL"]},
     "Miyapur": {"areas": ["Miyapur", "Kondapur", "Lingampally"]},
@@ -22,6 +20,15 @@ EXCLUDED_VENUE_TERMS = (
     "kompally",
     "secunderabad",
 )
+
+
+def _get_gemini_client():
+    if not GEMINI_API_KEY:
+        return None
+    try:
+        return genai.Client(api_key=GEMINI_API_KEY)
+    except (TypeError, ValueError):
+        return None
 
 
 def _distance_km(distance: object) -> float | None:
@@ -62,6 +69,10 @@ def geocode_location(location_query: str) -> tuple[float, float, str]:
 
 def search_grounded_venues(sub_activity: str, locality: str, lat: float, lon: float, exclude_names: list = None) -> list[dict]:
     """Fetches strictly 3 grounded local spots within 6km radius."""
+    client = _get_gemini_client()
+    if client is None:
+        return []
+
     exclude_names = exclude_names or []
     profile = VENUE_PROFILES.get(locality, {"areas": [locality]})
     query = f"best {sub_activity} in {' or '.join(profile['areas'])} Hyderabad verified venues"

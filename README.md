@@ -65,6 +65,8 @@ Create a `.env` file in the project root. Keep it private and never commit it:
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
+For Streamlit Cloud, add `GEMINI_API_KEY` under **App settings > Secrets** instead of creating a `.env` file. The app will still start without the key, but venue recommendations will remain unavailable until it is configured.
+
 ## Run
 
 Start the web dashboard:

@@ -7,7 +7,22 @@ load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 # Pin explicitly to gemini-3.5-flash-lite
 MODEL_NAME = "gemini-3.5-flash-lite"
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+
+def _load_gemini_api_key() -> str:
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if api_key:
+        return api_key
+
+    try:
+        import streamlit as st
+
+        return str(st.secrets.get("GEMINI_API_KEY", "")).strip()
+    except Exception:
+        return ""
+
+
+GEMINI_API_KEY = _load_gemini_api_key()
 
 # Default spatial coordinates (Hyderabad central fallback)
 DEFAULT_LAT = 17.4435
