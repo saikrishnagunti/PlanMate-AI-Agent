@@ -17,6 +17,16 @@ env/
 .DS_Store
 Thumbs.db
 
+# Streamlit local state and logs
+.streamlit/
+*.log
+
+# Build and coverage artifacts
+dist/
+build/
+.coverage
+htmlcov/
+
 # Intermediate testing and experimental files
 app_*.py
 PlanMate_*.py

@@ -1,175 +1,100 @@
-# 🎯 PlanMate: Autonomous Activity & Dining AI Agent
+# PlanMate AI
 
-PlanMate is an autonomous lifestyle and daily planning conversational AI agent powered by **Google Gemini 2.5 Flash**. It helps users discover leisure activities, sports sessions, dining spots, and relaxation spaces without hallucinated venues or stale information.
+PlanMate is a Hyderabad-focused Streamlit dashboard for discovering nearby activities, dining, and relaxation options. It combines browser location, manual map exploration, live weather, and Gemini-powered venue research in a LangGraph workflow.
 
-Instead of guessing locations, PlanMate evaluates real-time meteorological conditions (**wttr.in**) and executes targeted category searches linked directly to verified places on **Google Maps**.
+The app favors no result over an invented venue. Recommendations are accepted only when the returned locality, activity, and distance satisfy the validation rules, including the six-kilometre search radius.
 
----
+## Features
 
-## 🏗️ Architecture & ReAct Workflow
+- Browser geolocation with an explicit ON/OFF control.
+- Manual locality, address, map URL, or latitude/longitude selection.
+- Nearby-area navigation without enabling browser tracking.
+- Live Open-Meteo weather context for the selected coordinates.
+- DuckDuckGo-grounded Gemini venue research with locality and distance filtering.
+- Google Maps links for accepted venues and a general map exploration option.
+- Streamlit interface with a bundled browser-location component.
 
-PlanMate operates on an iterative **ReAct (Reasoning + Acting)** tool execution loop:
-
-```text
-                            ┌────────────────────────┐
-                            │       User Query       │
-                            └───────────┬────────────┘
-                                        │
-                                        ▼
-                      ┌────────────────────────────────────┐
-                      │    System Instructions & Firewall  │
-                      │       (Scope & Domain Guardrails)  │
-                      └─────────────────┬──────────────────┘
-                                        │
-                                        ▼
-                      ┌────────────────────────────────────┐
-                      │    Gemini 2.5 Flash Reasoning      │
-                      │  (Parallel Tool Dispatch Decision) │
-                      └─────────┬────────────────┬─────────┘
-                                │                │
-            ┌───────────────────┘                └───────────────────┐
-            ▼                                                        ▼
-┌───────────────────────────┐                            ┌───────────────────────────┐
-│     get_live_weather      │                            │  search_places_with_maps  │
-│    (wttr.in REST API)     │                            │ (Targeted Google Maps API)│
-│  - Real-time Temp & Cond  │                            │  - Keyword Taxonomy       │
-│  - Precipitation Checks   │                            │  - Clean Deep-Links       │
-│  - Outdoor Suitability    │                            │  - Zero Venue Invention   │
-└───────────┬───────────────┘                            └───────────┬───────────────┘
-            │                                                        │
-            └───────────────────┬────────────────────────────────────┘
-                                │
-                                ▼
-                      ┌────────────────────────────────────┐
-                      │    Synthesized Final Response      │
-                      │  (Weather Block + Verified Links)  │
-                      └────────────────────────────────────┘
-```
-
----
-
-## 🚀 Key Technical Highlights
-
-* **Parallel Tool Dispatching**: Triggers both `get_live_weather` and `search_places_with_maps` concurrently in the initial model turn, cutting token overhead and API hops by 50%.
-
-* **Strict Grounding & Anti-Hallucination**: Eliminates fake venue hallucinations by constraining recommendations to verified Google Maps search intents rather than ungrounded shop names.
-
-* **Real-Time Weather Grounding**: Evaluates live weather conditions via `wttr.in`. If precipitation or adverse weather is present, the agent alerts the user and pivots outdoor plans to indoor options.
-
-* **Conversational Locality Anchoring**: Preserves user-declared localities (e.g., Manikonda, Madhapur, Kondapur) across follow-up turns without geographic amnesia.
-
-* **Keyword Normalizer**: Maps ~80 user intents and colloquial phrases (`boxcricket`, `futsal`, `mandi`, `gokarting`, `spa`, `sushi`) into targeted query terms.
-
-* **Rate-Limit Backoff Engine**: Automatically intercepts HTTP 429 quota exhaustion errors, parses Google's exact retry delay, and renders an active countdown timer before resuming execution.
-
-* **Domain Firewall**: Deflects out-of-scope requests (coding, homework, politics) using an explicit refusal prompt.
-
----
-
-## 📂 Project Structure
+## Project Structure
 
 ```text
-PlanMate-AI-Agent/
-│
-├── .env                  # Private Gemini API credentials (Git-ignored)
-├── .gitignore            # Secret & artifact exclusion rules
-├── requirements.txt      # Python runtime dependencies
-├── README.md             # Project documentation
-├── PlanMate.py           # CLI interactive terminal REPL
-└── app.py                # Streamlit web application interface
+PlanMate/
+├── app.py                         # Streamlit dashboard
+├── cli_test.py                    # Optional terminal CLI
+├── requirements.txt               # Python dependencies
+├── src/
+│   ├── agents/                    # LangGraph nodes and graph
+│   ├── components/frontend/build/ # Browser geolocation component
+│   └── tools/                     # Weather, distance, and venue search
+├── styles/main.css                # Dashboard styling
+└── assets/                        # UI avatars
 ```
 
----
+## Requirements
 
-## 🛠️ Prerequisites & Setup
+- Python 3.10 or newer
+- A Gemini API key
+- A browser that supports the Geolocation API for live location
 
-### 1. Clone the Repository
+## Setup
+
 ```bash
-git clone [https://github.com/saikrishnagunti/PlanMate-AI-Agent.git](https://github.com/saikrishnagunti/PlanMate-AI-Agent.git)
-cd PlanMate-AI-Agent
+git clone https://github.com/saikrishnagunti/PlanMate-AI-Agent.git PlanMate
+cd PlanMate
+python -m venv .venv
 ```
 
-### 2. Install Dependencies
-```bash
+Activate the environment, then install dependencies:
+
+Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment Variables
-Create a `.env` file in the root directory:
-```env
-GEMINI_API_KEY=your_actual_gemini_api_key_here
+macOS/Linux:
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
----
+Create a `.env` file in the project root. Keep it private and never commit it:
 
-## 💻 Running the Application
+```env
+GEMINI_API_KEY=your_gemini_api_key
+```
 
-### Web UI (Streamlit Dashboard)
+## Run
+
+Start the web dashboard:
+
 ```bash
 streamlit run app.py
 ```
 
-### Terminal CLI (Interactive REPL)
+Open the local URL shown by Streamlit, normally `http://localhost:8501`. Live location requires granting permission in the browser; manual location selection remains available when tracking is OFF.
+
+Run the optional terminal client:
+
 ```bash
-python PlanMate.py
+python cli_test.py
 ```
 
----
+## Data and privacy
 
-## 🧪 Sample Interactions
+Location is used to resolve a selected Hyderabad area, fetch weather, and constrain venue discovery. Browser coordinates are requested only when live tracking is enabled. Nominatim, Open-Meteo, DuckDuckGo, Google Gemini, and Google Maps are external services used by the application.
 
-### 1. Activity & Dining Outing with Live Weather Grounding
-```text
-You: I am in Kondapur now, I want to play gokarting and eat frankie for supper at 5:00 PM
+The application does not promise that third-party listings are permanently current. Always confirm availability, hours, pricing, and travel conditions with the venue before leaving.
 
-PlanMate:
-⛅ **Weather Update**
-- **Temperature:** 32°C
-- **Condition:** Cloudy
-- **Humidity:** 37%
-- **Verdict:** Pleasant cloudy weather, perfect for track racing and grabbing a quick evening bite around 5:00 PM.
+## Validation
 
----
+Before pushing changes, run:
 
-📍 **Recommended Options**
-- **Top rated Gokarting spots in Kondapur**
-  * **Details:** Discover high-octane racing circuits and professional go-karting tracks around your location.
-  * **Directions:** [Open in Google Maps](https://www.google.com/maps/search/?api=1&query=go+karting+circuit+track+near+Kondapur+Hyderabad)
-
-- **Top rated Frankie spots in Kondapur**
-  * **Details:** Popular street food joints and eateries serving delicious, wrapped rolls and frankies.
-  * **Directions:** [Open in Google Maps](https://www.google.com/maps/search/?api=1&query=frankie+roll+wrap+near+Kondapur+Hyderabad)
+```bash
+python -m compileall app.py cli_test.py src
 ```
 
-### 2. Follow-up Turn with Locality Memory
-```text
-You: Change in plan, I want to eat sushi instead of frankie
+## License
 
-PlanMate:
-⛅ **Weather Update**
-- **Temperature:** 32°C
-- **Condition:** Cloudy
-- **Humidity:** 37%
-- **Verdict:** Great weather conditions for heading out to a restaurant in Kondapur.
-
----
-
-📍 **Recommended Options**
-- **Top rated Sushi spots in Kondapur**
-  * **Details:** Fine dining restaurants and cafes serving fresh sushi and authentic Japanese cuisine.
-  * **Directions:** [Open in Google Maps](https://www.google.com/maps/search/?api=1&query=sushi+bar+restaurant+near+Kondapur+Hyderabad)
-```
-
-### 3. Out-of-Domain Guardrail Deflection
-```text
-You: Write a python script to sort an array.
-
-PlanMate:
-I am PlanMate, your personal day planner! Please choose an activity (Play, Eat, Relax) so I can help plan your day.
-```
-
----
-
-## 📄 License
-
-MIT License. Developed for open-source AI agent research and development.
+MIT License.
